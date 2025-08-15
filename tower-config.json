@@ -1,0 +1,242 @@
+{
+  "towerConfig": {
+    "name": "湿法脱硫塔",
+    "type": "石灰石-石膏法",
+    "version": "1.0",
+    "specifications": {
+      "height": 30,
+      "diameter": 16,
+      "volume": 6032,
+      "material": "316L不锈钢",
+      "designPressure": "0.5 MPa",
+      "designTemperature": "120°C",
+      "workingPressure": "0.1 MPa",
+      "workingTemperature": "60°C"
+    },
+    "components": {
+      "sprayLayers": {
+        "count": 3,
+        "nozzleCount": 72,
+        "nozzleType": "空心锥形喷嘴",
+        "flowRate": "500 m³/h",
+        "pressure": "0.3 MPa",
+        "material": "哈氏合金C-276",
+        "positions": [17, 20, 23]
+      },
+      "demisters": {
+        "count": 2,
+        "type": "屋脊式除雾器",
+        "efficiency": ">99.8%",
+        "material": "316L不锈钢人字形除雾板",
+        "thickness": "180mm",
+        "plateAngle": "30°",
+        "plateSpacing": "25mm",
+        "washingSystem": "增强型三层冲洗 + 板间精细冲洗",
+        "pressureDrop": "<80 Pa",
+        "positions": [28, 25],
+        "design": {
+          "plateCount": 16,
+          "ridgeConfiguration": "人字形",
+          "supportStructure": "中央辐射梁 + 环形连接",
+          "washingNozzles": 12,
+          "microWashingNozzles": 32
+        }
+      },
+      "packingLayers": {
+        "type": "陶瓷拉西环",
+        "height": 15,
+        "specificSurfaceArea": "250 m²/m³",
+        "voidFraction": "0.74",
+        "material": "耐酸陶瓷",
+        "position": [5, 20]
+      },
+      "liquidDistributor": {
+        "type": "多孔板分布器",
+        "holeCount": 50,
+        "holeSize": "20mm",
+        "flowRate": "500 m³/h",
+        "material": "316L不锈钢",
+        "position": 24
+      },
+      "gasDistributor": {
+        "type": "多孔板分布器",
+        "holeCount": 100,
+        "holeSize": "10mm",
+        "openingRatio": "15%",
+        "pressureDrop": "<500 Pa",
+        "material": "316L不锈钢",
+        "position": 4
+      },
+      "internalSupports": {
+        "columnCount": 6,
+        "columnDiameter": "300mm",
+        "material": "Q235碳钢",
+        "loadCapacity": "100 ton"
+      },
+      "liquidCollection": {
+        "tankVolume": "50 m³",
+        "material": "316L不锈钢",
+        "drainPipes": 4,
+        "position": 1
+      }
+    },
+    "processParameters": {
+      "gasFlow": {
+        "inlet": "150000 Nm³/h",
+        "outlet": "148500 Nm³/h",
+        "temperature": "60°C",
+        "pressure": "0.1 MPa",
+        "so2Concentration": "2000 mg/Nm³"
+      },
+      "liquidFlow": {
+        "absorbent": "石灰石浆液",
+        "concentration": "20%",
+        "flowRate": "500 m³/h",
+        "temperature": "55°C",
+        "pH": "5.5-6.0"
+      },
+      "performance": {
+        "so2RemovalEfficiency": ">95%",
+        "dustRemovalEfficiency": ">50%",
+        "liquidToGasRatio": "15 L/m³",
+        "residenceTime": "8 s"
+      }
+    },
+    "materials": {
+      "steel": {
+        "color": "#8C8C8C",
+        "shininess": 100,
+        "opacity": 0.9,
+        "description": "316L不锈钢"
+      },
+      "glass": {
+        "color": "#87CEEB",
+        "opacity": 0.3,
+        "description": "透明玻璃"
+      },
+      "pipe": {
+        "color": "#4169E1",
+        "shininess": 80,
+        "description": "碳钢管道"
+      },
+      "spray": {
+        "color": "#00FF7F",
+        "opacity": 0.7,
+        "description": "喷淋效果"
+      },
+      "demister": {
+        "color": "#FFD700",
+        "description": "除雾器丝网"
+      },
+      "liquid": {
+        "color": "#1E90FF",
+        "opacity": 0.6,
+        "description": "石灰石浆液"
+      }
+    },
+    "animations": {
+      "spray": {
+        "enabled": true,
+        "speed": 0.005,
+        "amplitude": 0.2
+      },
+      "liquidFlow": {
+        "enabled": true,
+        "speed": 0.001,
+        "waveHeight": 0.1
+      },
+      "gasFlow": {
+        "enabled": true,
+        "particleCount": 200,
+        "velocity": 0.05
+      },
+      "smoke": {
+        "enabled": true,
+        "particleCount": 20,
+        "opacity": 0.3
+      }
+    },
+    "lighting": {
+      "ambient": {
+        "color": "#404040",
+        "intensity": 0.6
+      },
+      "directional": {
+        "color": "#ffffff",
+        "intensity": 1.0,
+        "position": [50, 80, 50],
+        "castShadow": true
+      },
+      "point": [
+        {
+          "color": "#ffffff",
+          "intensity": 0.8,
+          "position": [20, 40, 20],
+          "distance": 100
+        },
+        {
+          "color": "#ffffff",
+          "intensity": 0.8,
+          "position": [-20, 40, -20],
+          "distance": 100
+        }
+      ],
+      "spot": {
+        "color": "#ffffff",
+        "intensity": 1.5,
+        "position": [0, 60, 30],
+        "target": [0, 15, 0],
+        "angle": 0.52,
+        "penumbra": 0.3
+      }
+    },
+    "environment": {
+      "background": "#87CEEB",
+      "fog": {
+        "color": "#87CEEB",
+        "near": 50,
+        "far": 200
+      },
+      "ground": {
+        "size": 200,
+        "color": "#90EE90",
+        "opacity": 0.8
+      },
+      "buildings": 5,
+      "chimneys": 3,
+      "pipes": 3
+    },
+    "performance": {
+      "targetFPS": 60,
+      "maxPixelRatio": 2,
+      "shadowMapSize": 2048,
+      "antialias": true,
+      "toneMapping": "ACESFilmic",
+      "toneMappingExposure": 1.2
+    },
+    "controls": {
+      "enableDamping": true,
+      "dampingFactor": 0.05,
+      "minDistance": 20,
+      "maxDistance": 150,
+      "maxPolarAngle": 1.87,
+      "autoRotate": false,
+      "autoRotateSpeed": 0.5
+    },
+    "export": {
+      "formats": ["JSON", "GLTF", "PNG"],
+      "compression": true,
+      "includeAnimations": true,
+      "includeTextures": true
+    }
+  },
+  "metadata": {
+    "created": "2024-01-01T00:00:00Z",
+    "version": "1.0.0",
+    "author": "3D工艺流程图工程师",
+    "description": "湿法脱硫塔精细化3D模型配置文件",
+    "tags": ["脱硫", "环保", "工业", "3D", "可视化"],
+    "license": "MIT",
+    "documentation": "README.md"
+  }
+}
