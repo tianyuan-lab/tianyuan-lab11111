@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>支撑柱坐标调试</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        #output {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>支撑柱坐标数据调试</h1>
+    <div id="output"></div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.132.2';
+        import { GypsumCyclone } from './js/GypsumCyclone.js';
+
+        const output = document.getElementById('output');
+        
+        // 重定向console.log到页面显示
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            output.textContent += args.join(' ') + '\n';
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            output.textContent += 'ERROR: ' + args.join(' ') + '\n';
+        };
+
+        // 创建石膏旋流器实例
+        console.log('🚀 开始创建石膏旋流器...\n');
+        
+        try {
+            const cyclone = new GypsumCyclone();
+            
+            // 检查存储的坐标数据
+            setTimeout(() => {
+                console.log('\n📊 检查存储的支撑柱坐标数据:');
+                if (cyclone.supportLegCoordinates) {
+                    console.log(`支撑柱坐标数组长度: ${cyclone.supportLegCoordinates.length}`);
+                    cyclone.supportLegCoordinates.forEach((coord, index) => {
+                        console.log(`支撑柱${coord.id}: (${coord.x.toFixed(3)}, ${coord.topY.toFixed(3)}, ${coord.z.toFixed(3)})`);
+                        console.log(`  角度: ${(coord.angle * 180 / Math.PI).toFixed(1)}°`);
+                    });
+                } else {
+                    console.error('❌ supportLegCoordinates 未定义或为空');
+                }
+                
+                console.log('\n🎯 调试完成！');
+            }, 500);
+            
+        } catch (error) {
+            console.error('创建石膏旋流器时发生错误:', error);
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

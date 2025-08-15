@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>压缩空气储罐与锅炉连接测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 14px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 320px;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+        
+        .control-btn {
+            display: block;
+            margin: 5px 0;
+            padding: 8px 15px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: 1px solid #555;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            min-width: 150px;
+        }
+        
+        .control-btn:hover {
+            background: rgba(0,0,0,0.9);
+        }
+        
+        .status {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            font-size: 12px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            padding: 8px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        <div><strong>压缩空气储罐与锅炉连接测试</strong></div>
+        <div>• 金黄色管道：压缩空气连接</div>
+        <div>• 绿色管道：稀释水泵连接</div>
+        <div>• 蓝色管道：尿素循环泵连接</div>
+        <div>• 三套管道都连接到锅炉喷淋系统</div>
+        <div style="margin-top: 10px;">
+            <strong>特点：</strong><br>
+            • 压缩空气用于雾化尿素溶液<br>
+            • 稀释水用于稀释尿素浓度<br>
+            • 三套管道分层布置避免冲突
+        </div>
+        <div style="margin-top: 10px;">
+            <strong>操作：</strong><br>
+            • 鼠标拖拽旋转视角<br>
+            • 滚轮缩放<br>
+            • 右侧按钮控制视图
+        </div>
+    </div>
+    
+    <div id="controls">
+        <button class="control-btn" onclick="toggleBoilerView()">切换锅炉内外部视图</button>
+        <button class="control-btn" onclick="focusOnAirTank()">聚焦压缩空气储罐</button>
+        <button class="control-btn" onclick="focusOnConnections()">聚焦管道连接</button>
+        <button class="control-btn" onclick="focusOnBoiler()">聚焦锅炉</button>
+        <button class="control-btn" onclick="resetCamera()">重置视角</button>
+    </div>
+    
+    <div class="status" id="status">
+        状态：正在加载...
+    </div>
+
+    <!-- Three.js 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- 模型文件 -->
+    <script src="js/PowerPlantBoiler.js"></script>
+    <script src="js/AirCompressorRoom.js"></script>
+    <script src="js/DemineralizedWaterTank.js"></script>
+    <script src="js/UreaCirculationPump.js"></script>
+    <script src="js/PipeConnection.js"></script>
+
+    <script>
+        // 场景设置
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+
+        // 相机设置
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(120, 80, 120);
+
+        // 渲染器设置
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // 添加轨道控制器
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 25, 0);
+
+        // 添加光照
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(100, 100, 50);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+
+        // 添加地面
+        const groundGeometry = new THREE.PlaneGeometry(400, 400);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x90EE90 });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // 全局变量
+        let boiler, airCompressorRoom, demineralizedWaterTank, ureaCirculationPump1, ureaCirculationPump2;
+        let isBoilerInteriorView = false;
+
+        // 创建工业综合楼标签函数
+        function createIndustrialBuildingLabel(buildingGroup, labelText, position, color = '#FFFFFF') {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 320;
+            canvas.height = 100;
+            
+            context.font = 'Bold 40px Microsoft YaHei, Arial';
+            context.fillStyle = color;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            
+            context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            roundRect(context, 10, 10, canvas.width - 20, canvas.height - 20, 10);
+            context.fill();
+            
+            context.strokeStyle = color;
+            context.lineWidth = 3;
+            roundRect(context, 10, 10, canvas.width - 20, canvas.height - 20, 10);
+            context.stroke();
+            
+            context.fillStyle = color;
+            context.fillText(labelText, canvas.width / 2, canvas.height / 2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            
+            const material = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 0.95,
+                alphaTest: 0.01
+            });
+            
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(15, 4, 1);
+            sprite.position.set(position.x, position.y, position.z);
+            sprite.name = `buildingLabel_${labelText}`;
+            
+            buildingGroup.add(sprite);
+            console.log(`✓ 创建${labelText}标签完成`);
+        }
+        
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+        }
+
+        // 初始化场景
+        async function initScene() {
+            updateStatus('创建锅炉模型...');
+            
+            // 创建锅炉
+            boiler = new PowerPlantBoiler({
+                name: '测试锅炉',
+                position: { x: 0, y: 0, z: 0 }
+            });
+            scene.add(boiler.getGroup());
+            window.boiler = boiler;
+            
+            // 为锅炉添加标签
+            createIndustrialBuildingLabel(
+                boiler.getGroup(), 
+                '火电厂锅炉', 
+                { x: 10, y: boiler.dimensions.supportHeight + boiler.dimensions.mainHeight + 15, z: 0 }, 
+                '#FFD54F'
+            );
+
+            updateStatus('创建空压机房和压缩空气储罐...');
+            
+            // 创建空压机房（包含压缩空气储罐）
+            airCompressorRoom = new AirCompressorRoom({
+                position: { x: -80, y: 0, z: -30 },
+                rotation: { x: 0, y: 0, z: 0 },
+                size: { width: 22, height: 11, depth: 28 }
+            });
+            scene.add(airCompressorRoom.getGroup());
+            window.airCompressorRoom = airCompressorRoom;
+            
+            // 为空压机房添加标签
+            createIndustrialBuildingLabel(airCompressorRoom.getGroup(), '空压机房', { x: 0, y: 13, z: 0 }, '#87CEFA');
+
+            updateStatus('创建除盐水箱和稀释水泵...');
+            
+            // 创建除盐水箱（包含稀释水泵）
+            demineralizedWaterTank = new DemineralizedWaterTank({
+                name: '除盐水箱',
+                position: { x: 60, y: 0, z: -20 },
+                height: 20,
+                diameter: 10,
+            });
+            scene.add(demineralizedWaterTank.getGroup());
+            window.demineralizedWaterTank = demineralizedWaterTank;
+
+            updateStatus('创建尿素循环泵...');
+            
+            // 创建两个尿素循环泵
+            ureaCirculationPump1 = new UreaCirculationPump({
+                name: '尿素溶液循环泵1',
+                position: { x: -30, y: 0, z: -20 },
+                rotation: { x: 0, y: Math.PI / 2, z: 0 },
+                scale: 1.0
+            });
+            
+            ureaCirculationPump2 = new UreaCirculationPump({
+                name: '尿素溶液循环泵2',
+                position: { x: -30, y: 0, z: -15 },
+                rotation: { x: 0, y: Math.PI / 2, z: 0 },
+                scale: 1.0
+            });
+            
+            scene.add(ureaCirculationPump1.getGroup());
+            scene.add(ureaCirculationPump2.getGroup());
+
+            updateStatus('创建管道连接...');
+            
+            // 延迟创建管道连接
+            setTimeout(() => {
+                createUreaPipeConnections();
+                createDilutionPipeConnections();
+                createCompressedAirConnection();
+                updateStatus('所有连接创建完成！三套管道系统已就绪');
+            }, 1000);
+        }
+
+        // 创建尿素管道连接
+        function createUreaPipeConnections() {
+            try {
+                const pump1Outlet = ureaCirculationPump1.getPortWorldPosition('outlet');
+                const pump2Outlet = ureaCirculationPump2.getPortWorldPosition('outlet');
+                const sprayerRef = boiler.getUreaSprayerWorldPosition('label');
+                const boilerMainInlet = sprayerRef || boiler.getPortWorldPosition('ureaMainInlet');
+                
+                if (pump1Outlet && pump2Outlet && boilerMainInlet) {
+                    const mergePointY = Math.max(pump1Outlet.y, pump2Outlet.y) + 6;
+                    const mergePointX = (pump1Outlet.x + pump2Outlet.x) / 2;
+                    const mergePointZ = pump1Outlet.z;
+                    const mergePoint = { x: mergePointX, y: mergePointY, z: mergePointZ };
+                    
+                    // 创建尿素管道组
+                    if (!boiler.ureaExternalPipeGroup) {
+                        boiler.ureaExternalPipeGroup = new THREE.Group();
+                        boiler.ureaExternalPipeGroup.name = 'ureaExternalPipeGroup';
+                        scene.add(boiler.ureaExternalPipeGroup);
+                    }
+                    
+                    // 泵1到汇合点
+                    const path1ToMerge = [
+                        { x: pump1Outlet.x, y: pump1Outlet.y, z: pump1Outlet.z },
+                        { x: pump1Outlet.x, y: mergePointY, z: pump1Outlet.z },
+                        { x: mergePointX, y: mergePointY, z: mergePointZ }
+                    ];
+                    const pipe1ToMerge = new PipeConnection({
+                        name: '循环泵1→汇合点',
+                        startPoint: pump1Outlet,
+                        endPoint: mergePoint,
+                        pipeRadius: 0.15,
+                        pipeColor: 0x4A90E2,
+                        showFlow: true,
+                        flowDirection: 'forward',
+                        pathStrategy: 'default',
+                        customPathPoints: path1ToMerge
+                    });
+                    boiler.ureaExternalPipeGroup.add(pipe1ToMerge.group);
+                    
+                    // 泵2到汇合点
+                    const path2ToMerge = [
+                        { x: pump2Outlet.x, y: pump2Outlet.y, z: pump2Outlet.z },
+                        { x: pump2Outlet.x, y: mergePointY, z: pump2Outlet.z },
+                        { x: mergePointX, y: mergePointY, z: mergePointZ }
+                    ];
+                    const pipe2ToMerge = new PipeConnection({
+                        name: '循环泵2→汇合点',
+                        startPoint: pump2Outlet,
+                        endPoint: mergePoint,
+                        pipeRadius: 0.15,
+                        pipeColor: 0x4A90E2,
+                        showFlow: true,
+                        flowDirection: 'forward',
+                        pathStrategy: 'default',
+                        customPathPoints: path2ToMerge
+                    });
+                    boiler.ureaExternalPipeGroup.add(pipe2ToMerge.group);
+                    
+                    // 汇合点到锅炉
+                    const pathMergeToBoiler = [
+                        { x: mergePointX, y: mergePointY, z: mergePointZ },
+                        { x: mergePointX, y: mergePointY, z: boilerMainInlet.z - 8 },
+                        { x: boilerMainInlet.x, y: mergePointY, z: boilerMainInlet.z - 8 },
+                        { x: boilerMainInlet.x, y: boilerMainInlet.y, z: boilerMainInlet.z - 8 },
+                        { x: boilerMainInlet.x, y: boilerMainInlet.y, z: boilerMainInlet.z }
+                    ];
+                    const pipeMergeToBoiler = new PipeConnection({
+                        name: '汇合管→锅炉喷淋头系统',
+                        startPoint: mergePoint,
+                        endPoint: boilerMainInlet,
+                        pipeRadius: 0.2,
+                        pipeColor: 0x4A90E2,
+                        showFlow: true,
+                        flowDirection: 'forward',
+                        pathStrategy: 'default',
+                        customPathPoints: pathMergeToBoiler
+                    });
+                    boiler.ureaExternalPipeGroup.add(pipeMergeToBoiler.group);
+                    
+                    console.log('尿素循环泵管道连接创建完成');
+                }
+            } catch (e) {
+                console.warn('尿素管道连接创建失败:', e);
+            }
+        }
+
+        // 创建稀释水管道连接
+        function createDilutionPipeConnections() {
+            try {
+                const pump1Outlet = demineralizedWaterTank.getPumpPortWorldPosition('pumpC', 'outlet');
+                const pump2Outlet = demineralizedWaterTank.getPumpPortWorldPosition('pumpD', 'outlet');
+                const sprayerRef = boiler.getUreaSprayerWorldPosition('label');
+                const boilerMainInlet = sprayerRef || boiler.getPortWorldPosition('ureaMainInlet');
+                
+                if (pump1Outlet && pump2Outlet && boilerMainInlet) {
+                    const mergePointY = Math.max(pump1Outlet.y, pump2Outlet.y) + 8;
+                    const mergePointX = (pump1Outlet.x + pump2Outlet.x) / 2;
+                    const mergePointZ = pump1Outlet.z;
+                    const mergePoint = { x: mergePointX, y: mergePointY, z: mergePointZ };
+                    
+                    // 创建稀释水管道组
+                    if (!boiler.dilutionWaterPipeGroup) {
+                        boiler.dilutionWaterPipeGroup = new THREE.Group();
+                        boiler.dilutionWaterPipeGroup.name = 'dilutionWaterPipeGroup';
+                        scene.add(boiler.dilutionWaterPipeGroup);
+                    }
+                    
+                    // 稀释水泵1到汇合点
+                    const path1ToMerge = [
+                        { x: pump1Outlet.x, y: pump1Outlet.y, z: pump1Outlet.z },
+                        { x: pump1Outlet.x, y: mergePointY, z: pump1Outlet.z },
+                        { x: mergePointX, y: mergePointY, z: mergePointZ }
+                    ];
+                    const pipe1ToMerge = new PipeConnection({
+                        name: '稀释水泵1→汇合点',
+                        startPoint: pump1Outlet,
+                        endPoint: mergePoint,
+                        pipeRadius: 0.15,
+                        pipeColor: 0x10B981,
+                        showFlow: true,
+                        flowDirection: 'forward',
+                        pathStrategy: 'default',
+                        customPathPoints: path1ToMerge
+                    });
+                    boiler.dilutionWaterPipeGroup.add(pipe1ToMerge.group);
+                    
+                    // 稀释水泵2到汇合点
+                    const path2ToMerge = [
+                        { x: pump2Outlet.x, y: pump2Outlet.y, z: pump2Outlet.z },
+                        { x: pump2Outlet.x, y: mergePointY, z: pump2Outlet.z },
+                        { x: mergePointX, y: mergePointY, z: mergePointZ }
+                    ];
+                    const pipe2ToMerge = new PipeConnection({
+                        name: '稀释水泵2→汇合点',
+                        startPoint: pump2Outlet,
+                        endPoint: mergePoint,
+                        pipeRadius: 0.15,
+                        pipeColor: 0x10B981,
+                        showFlow: true,
+                        flowDirection: 'forward',
+                        pathStrategy: 'default',
+                        customPathPoints: path2ToMerge
+                    });
+                    boiler.dilutionWaterPipeGroup.add(pipe2ToMerge.group);
+                    
+                    // 汇合点到锅炉
+                    const pathMergeToBoiler = [
+                        { x: mergePointX, y: mergePointY, z: mergePointZ },
+                        { x: mergePointX, y: mergePointY, z: boilerMainInlet.z - 10 },
+                        { x: boilerMainInlet.x + 2, y: mergePointY, z: boilerMainInlet.z - 10 },
+                        { x: boilerMainInlet.x + 2, y: boilerMainInlet.y + 2, z: boilerMainInlet.z - 10 },
+                        { x: boilerMainInlet.x + 2, y: boilerMainInlet.y + 2, z: boilerMainInlet.z }
+                    ];
+                    const pipeMergeToBoiler = new PipeConnection({
+                        name: '稀释水汇合管→锅炉喷淋头系统',
+                        startPoint: mergePoint,
+                        endPoint: { x: boilerMainInlet.x + 2, y: boilerMainInlet.y + 2, z: boilerMainInlet.z },
+                        pipeRadius: 0.18,
+                        pipeColor: 0x10B981,
+                        showFlow: true,
+                        flowDirection: 'forward',
+                        pathStrategy: 'default',
+                        customPathPoints: pathMergeToBoiler
+                    });
+                    boiler.dilutionWaterPipeGroup.add(pipeMergeToBoiler.group);
+                    
+                    console.log('稀释水泵管道连接创建完成');
+                }
+            } catch (e) {
+                console.warn('稀释水管道连接创建失败:', e);
+            }
+        }
+
+        // 创建压缩空气连接
+        function createCompressedAirConnection() {
+            try {
+                const airTankOutlet = airCompressorRoom.getAirTankOutletWorldPosition();
+                const sprayerRef = boiler.getUreaSprayerWorldPosition('label');
+                const boilerMainInlet = sprayerRef || boiler.getPortWorldPosition('ureaMainInlet');
+                
+                if (airTankOutlet && boilerMainInlet) {
+                    // 创建压缩空气管道路径（单一管道，无需汇合点）
+                    const pathAirToBoiler = [
+                        { x: airTankOutlet.x, y: airTankOutlet.y, z: airTankOutlet.z },
+                        { x: airTankOutlet.x, y: airTankOutlet.y + 5, z: airTankOutlet.z }, // 向上5米
+                        { x: boilerMainInlet.x - 4, y: airTankOutlet.y + 5, z: airTankOutlet.z }, // 水平到锅炉附近
+                        { x: boilerMainInlet.x - 4, y: airTankOutlet.y + 5, z: boilerMainInlet.z - 12 }, // 向前移动到锅炉附近，比其他管道更远避免重叠
+                        { x: boilerMainInlet.x - 4, y: boilerMainInlet.y + 4, z: boilerMainInlet.z - 12 }, // 下降到入口高度附近
+                        { x: boilerMainInlet.x - 4, y: boilerMainInlet.y + 4, z: boilerMainInlet.z } // 连接到锅炉主入口附近
+                    ];
+                    
+                    const pipeAirToBoiler = new PipeConnection({
+                        name: '压缩空气储罐→锅炉喷淋头系统',
+                        startPoint: airTankOutlet,
+                        endPoint: { x: boilerMainInlet.x - 4, y: boilerMainInlet.y + 4, z: boilerMainInlet.z },
+                        pipeRadius: 0.12, // 压缩空气管道较细
+                        pipeColor: 0xFFD700, // 金黄色，区别于其他管道
+                        showFlow: true,
+                        flowDirection: 'forward',
+                        pathStrategy: 'default',
+                        customPathPoints: pathAirToBoiler
+                    });
+                    
+                    // 创建压缩空气管道组
+                    if (!boiler.compressedAirPipeGroup) {
+                        boiler.compressedAirPipeGroup = new THREE.Group();
+                        boiler.compressedAirPipeGroup.name = 'compressedAirPipeGroup';
+                        scene.add(boiler.compressedAirPipeGroup);
+                    }
+                    boiler.compressedAirPipeGroup.add(pipeAirToBoiler.group);
+                    
+                    console.log('压缩空气储罐管道连接创建完成');
+                }
+            } catch (e) {
+                console.warn('压缩空气管道连接创建失败:', e);
+            }
+        }
+
+        // 控制函数
+        function toggleBoilerView() {
+            if (isBoilerInteriorView) {
+                boiler.showExterior();
+                isBoilerInteriorView = false;
+                updateStatus('切换到外部视图 - 所有管道可见');
+            } else {
+                boiler.showInterior();
+                isBoilerInteriorView = true;
+                updateStatus('切换到内部视图 - 管道隐藏，显示内部结构');
+            }
+        }
+
+        function focusOnAirTank() {
+            camera.position.set(-60, 40, -10);
+            controls.target.set(-80, 10, -30);
+            controls.update();
+            updateStatus('聚焦压缩空气储罐');
+        }
+
+        function focusOnConnections() {
+            camera.position.set(30, 50, 30);
+            controls.target.set(0, 20, -10);
+            controls.update();
+            updateStatus('聚焦管道连接 - 三套管道系统');
+        }
+
+        function focusOnBoiler() {
+            camera.position.set(80, 60, 80);
+            controls.target.set(0, 25, 0);
+            controls.update();
+            updateStatus('聚焦锅炉');
+        }
+
+        function resetCamera() {
+            camera.position.set(120, 80, 120);
+            controls.target.set(0, 25, 0);
+            controls.update();
+            updateStatus('重置视角 - 全景视图');
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').textContent = `状态：${message}`;
+        }
+
+        // 渲染循环
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            controls.update();
+            
+            if (boiler && typeof boiler.updateFlameAnimation === 'function') {
+                boiler.updateFlameAnimation();
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 初始化
+        initScene();
+        animate();
+
+        console.log('压缩空气储罐与锅炉连接测试页面已加载');
+    </script>
+    
+    <!-- OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js"></script>
+</body>
+</html>
+
+
+
+
+

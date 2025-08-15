@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>脱硫塔调试测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #222;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #debug-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-family: monospace;
+            max-width: 400px;
+            max-height: 70vh;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        .error { color: #ff4444; }
+        .success { color: #44ff44; }
+        .warning { color: #ffaa00; }
+        .info { color: #44aaff; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="debug-info">
+        <h3>🔧 调试信息</h3>
+        <div id="debug-content">正在初始化...</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="js/NaNValidator.js"></script>
+    <script src="js/DesulfurizationTower.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let debugContent;
+
+        function debugLog(message, type = 'info') {
+            console.log(message);
+            if (!debugContent) {
+                debugContent = document.getElementById('debug-content');
+            }
+            if (debugContent) {
+                const timeStamp = new Date().toLocaleTimeString();
+                const className = type;
+                debugContent.innerHTML += `<div class="${className}">[${timeStamp}] ${message}</div>`;
+                debugContent.scrollTop = debugContent.scrollHeight;
+            }
+        }
+
+        async function init() {
+            try {
+                debugLog('=== 开始调试测试 ===', 'info');
+                
+                // 检查基础库
+                if (typeof THREE === 'undefined') {
+                    debugLog('❌ Three.js 未加载', 'error');
+                    return;
+                }
+                debugLog('✅ Three.js 已加载', 'success');
+                
+                if (typeof THREE.OrbitControls === 'undefined') {
+                    debugLog('⚠️  OrbitControls 未加载', 'warning');
+                } else {
+                    debugLog('✅ OrbitControls 已加载', 'success');
+                }
+
+                if (typeof DesulfurizationTower === 'undefined') {
+                    debugLog('❌ DesulfurizationTower 类未加载', 'error');
+                    return;
+                }
+                debugLog('✅ DesulfurizationTower 类已加载', 'success');
+
+                if (typeof DualTowerDesulfurizationSystem === 'undefined') {
+                    debugLog('❌ DualTowerDesulfurizationSystem 类未加载', 'error');
+                    return;
+                }
+                debugLog('✅ DualTowerDesulfurizationSystem 类已加载', 'success');
+
+                // 创建基础场景
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x87CEEB);
+                debugLog('✅ 场景创建完成', 'success');
+
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(50, 30, 50);
+                debugLog('✅ 相机创建完成', 'success');
+
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('container').appendChild(renderer.domElement);
+                debugLog('✅ 渲染器创建完成', 'success');
+
+                if (typeof THREE.OrbitControls !== 'undefined') {
+                    controls = new THREE.OrbitControls(camera, renderer.domElement);
+                    controls.enableDamping = true;
+                    controls.dampingFactor = 0.05;
+                    debugLog('✅ 控制器创建完成', 'success');
+                }
+
+                // 添加基础光照
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+                scene.add(ambientLight);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+                directionalLight.position.set(50, 80, 50);
+                scene.add(directionalLight);
+                debugLog('✅ 光照设置完成', 'success');
+
+                // 测试创建单个塔
+                debugLog('🏗️  尝试创建单个脱硫塔...', 'info');
+                try {
+                    const singleTowerConfig = {
+                        name: '测试脱硫塔',
+                        height: 30,
+                        upperRadius: 8,
+                        middleRadius: 8,
+                        lowerRadius: 12,
+                        position: { x: 0, y: 0, z: 0 },
+                        hasTrays: true,
+                        hasWetESP: false
+                    };
+                    
+                    const singleTower = new DesulfurizationTower(singleTowerConfig);
+                    debugLog('✅ 单塔实例创建成功', 'success');
+                    
+                    await singleTower.waitForInitialization();
+                    debugLog('✅ 单塔初始化完成', 'success');
+                    
+                    scene.add(singleTower.group);
+                    debugLog('✅ 单塔已添加到场景', 'success');
+                    
+                } catch (singleTowerError) {
+                    debugLog('❌ 单塔创建失败: ' + singleTowerError.message, 'error');
+                    debugLog('详细错误: ' + singleTowerError.stack, 'error');
+                    
+                    // 创建简单的测试几何体
+                    const testGeometry = new THREE.CylinderGeometry(8, 10, 30, 32);
+                    const testMaterial = new THREE.MeshPhongMaterial({ color: 0x8C8C8C });
+                    const testMesh = new THREE.Mesh(testGeometry, testMaterial);
+                    testMesh.position.set(0, 15, 0);
+                    scene.add(testMesh);
+                    debugLog('✅ 创建了简单测试几何体', 'success');
+                }
+
+                // 测试双塔系统（如果单塔成功）
+                debugLog('🏗️  尝试创建双塔系统...', 'info');
+                try {
+                    const dualTowerSystem = new DualTowerDesulfurizationSystem({
+                        spacing: 40
+                    });
+                    debugLog('✅ 双塔系统实例创建成功', 'success');
+                    
+                    await dualTowerSystem.waitForInitialization();
+                    debugLog('✅ 双塔系统初始化完成', 'success');
+                    
+                    // 移除单塔，添加双塔系统
+                    scene.clear();
+                    scene.add(ambientLight);
+                    scene.add(directionalLight);
+                    scene.add(dualTowerSystem.group);
+                    debugLog('✅ 双塔系统已添加到场景', 'success');
+                    
+                } catch (dualTowerError) {
+                    debugLog('❌ 双塔系统创建失败: ' + dualTowerError.message, 'error');
+                    debugLog('详细错误: ' + dualTowerError.stack, 'error');
+                }
+
+                // 开始渲染
+                animate();
+                debugLog('✅ 渲染循环已启动', 'success');
+                debugLog('=== 调试测试完成 ===', 'info');
+
+            } catch (error) {
+                debugLog('❌ 初始化过程发生致命错误: ' + error.message, 'error');
+                debugLog('详细错误: ' + error.stack, 'error');
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls) controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // 窗口调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 页面加载完成后启动
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

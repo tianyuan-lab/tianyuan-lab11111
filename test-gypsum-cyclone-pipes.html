@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>石膏旋流器管道系统测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            max-width: 350px;
+            z-index: 100;
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 100, 0, 0.2);
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div class="info-panel">
+        <h3>🔧 石膏旋流器管道系统测试（简化版）</h3>
+        <p>本测试验证以下功能：</p>
+        <ul>
+            <li>✅ 石膏旋流器中间部分的入浆口管道（向右延伸）</li>
+            <li>✅ 集流器底部的出水口管道</li>
+            <li>✅ 简单的白色工业管道连接到回收水箱中部</li>
+        </ul>
+        <div class="status" id="status">
+            状态：正在初始化...
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button onclick="resetCamera()">重置视角</button>
+        <button onclick="focusOnCyclone()">聚焦旋流器</button>
+        <button onclick="focusPipes()">查看管道</button>
+        <button onclick="toggleWireframe()">切换线框</button>
+    </div>
+
+    <!-- Three.js 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- 模型类 -->
+    <script src="js/GypsumCyclone.js"></script>
+    <script src="js/RecycleFilterTank.js"></script>
+    <script src="js/PipeConnection.js"></script>
+    
+    <script>
+        // 全局变量
+        let scene, camera, renderer, controls;
+        let gypsumCyclone, filterLiquidTank;
+        let wireframeMode = false;
+        
+        // 初始化场景
+        function init() {
+            updateStatus('创建场景...');
+            
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB); // 天蓝色背景
+            
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(15, 10, 15);
+            
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // 创建控制器
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.25;
+            
+            updateStatus('设置光照...');
+            setupLighting();
+            
+            updateStatus('创建设备...');
+            createEquipment();
+            
+            updateStatus('创建管道连接...');
+            setTimeout(createPipeConnections, 1000);
+            
+            // 开始渲染循环
+            animate();
+            
+            updateStatus('✅ 初始化完成！可以使用控制按钮查看不同角度。');
+        }
+        
+        // 设置光照
+        function setupLighting() {
+            // 环境光
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            
+            // 主光源
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(20, 30, 20);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 100;
+            directionalLight.shadow.camera.left = -30;
+            directionalLight.shadow.camera.right = 30;
+            directionalLight.shadow.camera.top = 30;
+            directionalLight.shadow.camera.bottom = -30;
+            scene.add(directionalLight);
+            
+            // 补充光源
+            const fillLight = new THREE.DirectionalLight(0x87CEEB, 0.3);
+            fillLight.position.set(-10, 10, -10);
+            scene.add(fillLight);
+        }
+        
+        // 创建设备
+        function createEquipment() {
+            // 创建地面
+            const groundGeometry = new THREE.PlaneGeometry(100, 100);
+            const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            
+            // 创建石膏旋流器
+            gypsumCyclone = new GypsumCyclone(
+                { x: 0, y: 0, z: 0 },
+                { x: 0, y: 0, z: 0 }
+            );
+            scene.add(gypsumCyclone.getGroup());
+            
+            // 创建回收水箱（放在旋流器左前方）
+            filterLiquidTank = new RecycleFilterTank({
+                name: '回收水箱',
+                height: 15,
+                radius: 4,
+                position: { x: -15, y: 0, z: -10 },
+                capacity: '1000m³',
+                material: '316L不锈钢'
+            });
+            scene.add(filterLiquidTank.group);
+            
+            console.log('✅ 设备创建完成');
+            console.log('石膏旋流器端口：', gypsumCyclone.ports);
+            console.log('滤液水箱底部接口：', filterLiquidTank.bottomInterface);
+        }
+        
+        // 创建简化的管道连接
+        function createPipeConnections() {
+            try {
+                // 石膏旋流器出水口位置（集流器底部）
+                const cycloneOutletPos = {
+                    x: 0, // 旋流器中心
+                    y: (4.0 - 1.5) * 2.5, // 集流器底部减去出水口延伸长度，再乘以缩放
+                    z: 0
+                };
+                
+                // 回收水箱中间部位连接点
+                const tankMiddlePos = {
+                    x: -15, // 回收水箱X位置
+                    y: 7.5, // 水箱中间高度（15米高的一半）
+                    z: -10 // 水箱Z位置
+                };
+                
+                console.log('旋流器出水口位置：', cycloneOutletPos);
+                console.log('回收水箱中部位置：', tankMiddlePos);
+                
+                // 创建简单的白色工业管道连接
+                const connectionPipe = new PipeConnection({
+                    name: '石膏旋流器→回收水箱',
+                    startPoint: cycloneOutletPos,
+                    endPoint: tankMiddlePos,
+                    pipeRadius: 0.15,
+                    pipeColor: 0xE0E0E0, // 白色工业管道
+                    showFlow: true,
+                    flowDirection: 'forward'
+                });
+                scene.add(connectionPipe.group);
+                
+                console.log('✅ 简化管道连接创建成功');
+                updateStatus('✅ 简化管道连接已创建！白色工业管道连接旋流器出水口到回收水箱中部。');
+                
+            } catch (error) {
+                console.error('❌ 管道连接创建失败：', error);
+                updateStatus('❌ 管道连接创建失败：' + error.message);
+            }
+        }
+        
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // 更新状态
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = message;
+            console.log(message);
+        }
+        
+        // 控制函数
+        function resetCamera() {
+            camera.position.set(15, 10, 15);
+            camera.lookAt(0, 0, 0);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+        
+        function focusOnCyclone() {
+            camera.position.set(8, 6, 8);
+            camera.lookAt(0, 3, 0);
+            controls.target.set(0, 3, 0);
+            controls.update();
+        }
+        
+        function focusPipes() {
+            camera.position.set(6, 4, 0);
+            camera.lookAt(7, 2, -5);
+            controls.target.set(7, 2, -5);
+            controls.update();
+        }
+        
+        function toggleWireframe() {
+            wireframeMode = !wireframeMode;
+            scene.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(mat => mat.wireframe = wireframeMode);
+                    } else {
+                        child.material.wireframe = wireframeMode;
+                    }
+                }
+            });
+        }
+        
+        // 窗口大小调整
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        window.addEventListener('resize', onWindowResize, false);
+        
+        // 启动应用
+        init();
+    </script>
+</body>
+</html>

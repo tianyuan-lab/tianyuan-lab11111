@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管道连接调试 - 专用版</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #1a1a1a;
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .debug-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 12px;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 100;
+            border: 2px solid #4CAF50;
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            border: 1px solid #666;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button.danger {
+            background: #f44336;
+        }
+        
+        button.danger:hover {
+            background: #da190b;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px 8px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+            border-left: 3px solid transparent;
+        }
+        
+        .log-info { 
+            background: rgba(0, 100, 255, 0.2); 
+            border-left-color: #0064ff;
+        }
+        .log-success { 
+            background: rgba(0, 255, 0, 0.2); 
+            border-left-color: #00ff00;
+        }
+        .log-warning { 
+            background: rgba(255, 165, 0, 0.2); 
+            border-left-color: #ffa500;
+        }
+        .log-error { 
+            background: rgba(255, 0, 0, 0.2); 
+            border-left-color: #ff0000;
+        }
+        
+        .status-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+            font-size: 14px;
+        }
+        
+        .status-ok { color: #4CAF50; }
+        .status-error { color: #f44336; }
+        .status-warning { color: #ff9800; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div class="status-indicator">
+        <div id="status">🔄 初始化中...</div>
+    </div>
+    
+    <div class="debug-panel">
+        <h3>🔧 管道连接专用调试器</h3>
+        <div id="debug-log"></div>
+    </div>
+    
+    <div class="controls">
+        <button onclick="runFullTest()">🚀 完整测试</button>
+        <button onclick="testConnection()">🔗 测试连接</button>
+        <button onclick="showAllObjects()">📋 显示所有对象</button>
+        <button onclick="findPipes()">🔍 查找管道</button>
+        <button onclick="clearLog()" class="danger">🗑️ 清除日志</button>
+        <button onclick="resetView()">📷 重置视角</button>
+    </div>
+
+    <!-- Three.js 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- 模型类 -->
+    <script src="js/GypsumCyclone.js"></script>
+    <script src="js/RecycleFilterTank.js"></script>
+    <script src="js/PipeConnection.js"></script>
+    <script src="js/IndustrialBuilding.js"></script>
+    
+    <script>
+        // 全局变量
+        let scene, camera, renderer, controls;
+        let gypsumCyclone, recycleFilterTank, industrialBuilding;
+        let debugMode = true;
+        
+        // 日志函数
+        function addLog(message, type = 'info') {
+            const logDiv = document.getElementById('debug-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            
+            console.log(`[${timestamp}] ${message}`);
+            
+            // 更新状态指示器
+            updateStatus(message, type);
+        }
+        
+        function updateStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            const shortMessage = message.length > 50 ? message.substring(0, 47) + '...' : message;
+            
+            statusDiv.className = `status-${type}`;
+            statusDiv.textContent = shortMessage;
+        }
+        
+        function clearLog() {
+            document.getElementById('debug-log').innerHTML = '';
+        }
+        
+        // 初始化场景
+        function init() {
+            addLog('🚀 初始化调试场景...', 'info');
+            
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(50, 30, 50);
+            
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // 创建控制器
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.25;
+            
+            setupLighting();
+            createEquipment();
+            
+            // 开始渲染循环
+            animate();
+            
+            addLog('✅ 场景初始化完成', 'success');
+        }
+        
+        // 设置光照
+        function setupLighting() {
+            // 环境光
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            
+            // 主光源
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(50, 80, 50);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            addLog('💡 光照系统设置完成', 'info');
+        }
+        
+        // 创建设备
+        function createEquipment() {
+            addLog('🏗️ 创建设备...', 'info');
+            
+            // 创建地面
+            const groundGeometry = new THREE.PlaneGeometry(200, 200);
+            const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            
+            // 创建工业综合楼
+            try {
+                addLog('🏢 创建工业综合楼...', 'info');
+                industrialBuilding = new IndustrialBuilding(
+                    { x: 26, y: 0, z: 18 },
+                    { x: 0, y: 0, z: 0 }
+                );
+                scene.add(industrialBuilding.getGroup());
+                addLog('✅ 工业综合楼创建成功', 'success');
+                
+                // 等待石膏旋流器创建
+                setTimeout(() => {
+                    if (window.gypsumCyclone) {
+                        addLog('✅ 石膏旋流器实例已找到', 'success');
+                        gypsumCyclone = window.gypsumCyclone;
+                    } else {
+                        addLog('⚠️ 石膏旋流器实例未找到', 'warning');
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                addLog('❌ 工业综合楼创建失败: ' + error.message, 'error');
+            }
+            
+            // 创建回收水箱
+            try {
+                addLog('🛢️ 创建回收水箱...', 'info');
+                recycleFilterTank = new RecycleFilterTank({
+                    name: '回收水箱',
+                    height: 25,
+                    radius: 8,
+                    position: { x: -50, y: 0, z: 70 },
+                    capacity: '2000m³',
+                    material: '316L不锈钢'
+                });
+                scene.add(recycleFilterTank.group);
+                window.recycleFilterTank = recycleFilterTank;
+                addLog('✅ 回收水箱创建成功', 'success');
+            } catch (error) {
+                addLog('❌ 回收水箱创建失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 运行完整测试
+        function runFullTest() {
+            addLog('🚀 开始运行完整测试流程...', 'info');
+            
+            setTimeout(() => {
+                addLog('第1步: 检查设备实例', 'info');
+                checkInstances();
+                
+                setTimeout(() => {
+                    addLog('第2步: 显示所有对象', 'info');
+                    showAllObjects();
+                    
+                    setTimeout(() => {
+                        addLog('第3步: 测试管道连接', 'info');
+                        testConnection();
+                        
+                        setTimeout(() => {
+                            addLog('第4步: 查找管道', 'info');
+                            findPipes();
+                        }, 1000);
+                    }, 1000);
+                }, 1000);
+            }, 1000);
+        }
+        
+        // 检查实例
+        function checkInstances() {
+            addLog('📋 检查设备实例状态:', 'info');
+            addLog('  - window.gypsumCyclone: ' + !!window.gypsumCyclone, 'info');
+            addLog('  - window.recycleFilterTank: ' + !!window.recycleFilterTank, 'info');
+            addLog('  - scene.children.length: ' + scene.children.length, 'info');
+            
+            if (window.gypsumCyclone) {
+                const group = window.gypsumCyclone.getGroup();
+                addLog('  - 石膏旋流器组位置: ' + JSON.stringify(group.position), 'info');
+                addLog('  - 石膏旋流器组缩放: ' + JSON.stringify(group.scale), 'info');
+                addLog('  - 石膏旋流器组子对象数量: ' + group.children.length, 'info');
+            }
+            
+            if (window.recycleFilterTank) {
+                addLog('  - 回收水箱位置: ' + JSON.stringify(window.recycleFilterTank.group.position), 'info');
+                addLog('  - 回收水箱配置: ' + JSON.stringify(window.recycleFilterTank.tankConfig), 'info');
+            }
+        }
+        
+        // 显示所有对象
+        function showAllObjects() {
+            addLog('📋 场景中的所有命名对象:', 'info');
+            let objectCount = 0;
+            scene.traverse((child) => {
+                if (child.name) {
+                    addLog('  - ' + child.name + ' (类型: ' + child.type + ')', 'info');
+                    objectCount++;
+                }
+            });
+            addLog('总计找到 ' + objectCount + ' 个命名对象', 'info');
+        }
+        
+        // 查找管道
+        function findPipes() {
+            addLog('🔍 查找场景中的管道对象:', 'info');
+            let pipeCount = 0;
+            scene.traverse((child) => {
+                if (child.name && (child.name.includes('管道') || child.name.includes('Pipe') || child.name.includes('→'))) {
+                    addLog('  - 找到管道: ' + child.name, 'success');
+                    addLog('    位置: ' + JSON.stringify(child.position), 'info');
+                    addLog('    可见: ' + child.visible, 'info');
+                    pipeCount++;
+                }
+            });
+            
+            if (pipeCount === 0) {
+                addLog('❌ 未找到任何管道对象', 'error');
+            } else {
+                addLog('✅ 找到 ' + pipeCount + ' 个管道对象', 'success');
+            }
+        }
+        
+        // 测试连接 - 复制main.js中的逻辑
+        function testConnection() {
+            try {
+                addLog('🔧 开始创建石膏旋流器到回收水箱的管道连接（使用标签定位）...', 'info');
+                
+                // 检查设备实例是否存在
+                if (!window.gypsumCyclone || !window.recycleFilterTank) {
+                    addLog('❌ 设备实例未找到', 'error');
+                    return;
+                }
+                
+                // 使用标签定位方法查找石膏旋流器的出水口标签
+                addLog('🔍 开始查找石膏旋流器出水口标签...', 'info');
+                const gypsumCycloneGroup = window.gypsumCyclone.getGroup();
+                
+                // 列出所有子对象的名称
+                addLog('📋 石膏旋流器组中的所有对象:', 'info');
+                gypsumCycloneGroup.traverse((child) => {
+                    if (child.name) {
+                        addLog('  - ' + child.name, 'info');
+                    }
+                });
+                
+                let outletObject = gypsumCycloneGroup.getObjectByName('出水口连接管');
+                
+                if (!outletObject) {
+                    addLog('🔍 未找到出水口连接管，尝试查找出水口法兰...', 'warning');
+                    outletObject = gypsumCycloneGroup.getObjectByName('出水口法兰');
+                }
+                
+                if (!outletObject) {
+                    addLog('🔍 未找到出水口法兰，遍历查找包含"出水口"的对象...', 'warning');
+                    gypsumCycloneGroup.traverse((child) => {
+                        if (child.name && child.name.includes('出水口') && !outletObject) {
+                            outletObject = child;
+                            addLog('📍 找到出水口相关对象: ' + child.name, 'success');
+                        }
+                    });
+                }
+                
+                if (!outletObject) {
+                    addLog('❌ 未找到石膏旋流器出水口相关对象，使用固定坐标', 'warning');
+                    
+                    // 使用固定坐标
+                    const cyclonePos = gypsumCycloneGroup.position;
+                    const cycloneScale = gypsumCycloneGroup.scale;
+                    const fixedOutletPos = {
+                        x: cyclonePos.x,
+                        y: cyclonePos.y - 1.5 * cycloneScale.y,
+                        z: cyclonePos.z
+                    };
+                    
+                    const tankPos = window.recycleFilterTank.group.position;
+                    const tankMiddlePos = {
+                        x: tankPos.x,
+                        y: tankPos.y + window.recycleFilterTank.tankConfig.height / 2,
+                        z: tankPos.z
+                    };
+                    
+                    // 创建管道连接
+                    const connectionPipe = new PipeConnection({
+                        name: '石膏旋流器→回收水箱（固定坐标）',
+                        startPoint: fixedOutletPos,
+                        endPoint: tankMiddlePos,
+                        pipeRadius: 0.15,
+                        pipeColor: 0xE0E0E0,
+                        showFlow: true,
+                        flowDirection: 'forward'
+                    });
+                    
+                    scene.add(connectionPipe.group);
+                    addLog('✅ 使用固定坐标创建管道连接成功！', 'success');
+                    return;
+                }
+                
+                // 如果找到了出水口对象，使用其位置
+                const outletWorldPos = new THREE.Vector3();
+                outletObject.getWorldPosition(outletWorldPos);
+                addLog('🎯 石膏旋流器出水口位置: ' + JSON.stringify(outletWorldPos), 'info');
+                
+                // 获取回收水箱中部位置
+                const tankPos = window.recycleFilterTank.group.position;
+                const tankMiddlePos = {
+                    x: tankPos.x,
+                    y: tankPos.y + window.recycleFilterTank.tankConfig.height / 2,
+                    z: tankPos.z
+                };
+                
+                addLog('🎯 回收水箱中部位置: ' + JSON.stringify(tankMiddlePos), 'info');
+                
+                // 创建管道连接
+                const connectionPipe = new PipeConnection({
+                    name: '石膏旋流器→回收水箱（标签定位）',
+                    startPoint: {
+                        x: outletWorldPos.x,
+                        y: outletWorldPos.y,
+                        z: outletWorldPos.z
+                    },
+                    endPoint: tankMiddlePos,
+                    pipeRadius: 0.15,
+                    pipeColor: 0xE0E0E0,
+                    showFlow: true,
+                    flowDirection: 'forward'
+                });
+                
+                scene.add(connectionPipe.group);
+                addLog('✅ 石膏旋流器到回收水箱管道连接创建完成！', 'success');
+                
+                // 计算距离
+                const distance = Math.sqrt(
+                    Math.pow(tankMiddlePos.x - outletWorldPos.x, 2) +
+                    Math.pow(tankMiddlePos.y - outletWorldPos.y, 2) +
+                    Math.pow(tankMiddlePos.z - outletWorldPos.z, 2)
+                );
+                addLog('📏 管道长度: ' + distance.toFixed(2) + ' 米', 'info');
+                
+            } catch (error) {
+                addLog('❌ 创建管道连接失败: ' + error.message, 'error');
+                addLog('错误详情: ' + error.stack, 'error');
+            }
+        }
+        
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // 重置视角
+        function resetView() {
+            camera.position.set(50, 30, 50);
+            camera.lookAt(0, 0, 0);
+            controls.target.set(0, 0, 0);
+            controls.update();
+            addLog('📷 视角已重置', 'info');
+        }
+        
+        // 窗口大小调整
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        window.addEventListener('resize', onWindowResize, false);
+        
+        // 启动应用
+        init();
+        
+        // 延迟运行完整测试
+        setTimeout(() => {
+            addLog('🎯 自动运行完整测试...', 'info');
+            runFullTest();
+        }, 3000);
+    </script>
+</body>
+</html>

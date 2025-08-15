@@ -1,0 +1,37 @@
+{
+  "project_name": "3d-desulfurization-tower",
+  "version": "1.0.0",
+  "build_dir": "dist",
+  "exclude_files": [
+    "*.md",
+    "*.py",
+    "*.bat",
+    "requirements.txt",
+    "debug-*.html",
+    "test-*.html",
+    "minimal-debug.html",
+    "server.py",
+    "deploy.py",
+    "deploy-config.json"
+  ],
+  "cdn": {
+    "three_js": "https://cdn.skypack.dev/three@0.132.2",
+    "orbit_controls": "https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/OrbitControls.js"
+  },
+  "optimization": {
+    "minify_js": false,
+    "compress_assets": true,
+    "generate_manifest": true
+  },
+  "deployment": {
+    "domain": "your-domain.com",
+    "ssl": true,
+    "port": 80,
+    "ssl_port": 443
+  },
+  "performance": {
+    "enable_gzip": true,
+    "cache_duration": "1y",
+    "preload_critical_resources": true
+  }
+}

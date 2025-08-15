@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最小管道调试</title>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #333; font-family: Arial; }
+        #container { width: 100vw; height: 100vh; }
+        #log { position: absolute; top: 10px; left: 10px; color: white; font-size: 12px; 
+               background: rgba(0,0,0,0.8); padding: 10px; border-radius: 5px; max-height: 80vh; 
+               overflow-y: auto; width: 350px; z-index: 1000; }
+        #controls { position: absolute; top: 10px; right: 10px; z-index: 1000; }
+        .btn { display: block; margin: 5px 0; padding: 8px 15px; background: rgba(0,0,0,0.7); 
+               color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer; }
+        .btn:hover { background: rgba(0,0,0,0.9); }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="log"><strong>最小管道调试</strong><br><div id="logContent">准备开始...</div></div>
+    <div id="controls">
+        <button class="btn" onclick="testBasic()">测试基础功能</button>
+        <button class="btn" onclick="testPipe()">测试管道创建</button>
+        <button class="btn" onclick="testModels()">测试模型加载</button>
+        <button class="btn" onclick="clearLog()">清空日志</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="js/PipeConnection.js"></script>
+
+    <script>
+        let scene, camera, renderer;
+        let logs = [];
+
+        function log(message) {
+            logs.push(`${new Date().toLocaleTimeString()}: ${message}`);
+            document.getElementById('logContent').innerHTML = logs.slice(-15).join('<br>');
+            console.log(message);
+        }
+
+        function clearLog() {
+            logs = [];
+            document.getElementById('logContent').innerHTML = '日志已清空';
+        }
+
+        function testBasic() {
+            log('=== 测试基础功能 ===');
+            
+            try {
+                // 场景
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x87CEEB);
+                log('✓ 场景创建成功');
+
+                // 相机
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+                camera.position.set(0, 50, 100);
+                log('✓ 相机创建成功');
+
+                // 渲染器
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                document.getElementById('container').appendChild(renderer.domElement);
+                log('✓ 渲染器创建成功');
+
+                // 光照
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+                scene.add(ambientLight);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(100, 100, 50);
+                scene.add(directionalLight);
+                log('✓ 光照创建成功');
+
+                // 添加一个测试立方体
+                const geometry = new THREE.BoxGeometry(10, 10, 10);
+                const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+                const cube = new THREE.Mesh(geometry, material);
+                scene.add(cube);
+                log('✓ 测试立方体添加成功');
+
+                // 开始渲染
+                animate();
+                log('✓ 基础功能测试完成');
+
+            } catch (e) {
+                log(`❌ 基础功能测试失败: ${e.message}`);
+            }
+        }
+
+        function testPipe() {
+            if (!scene) {
+                log('❌ 请先执行基础功能测试');
+                return;
+            }
+
+            log('=== 测试管道创建 ===');
+            
+            try {
+                // 检查PipeConnection类
+                if (typeof PipeConnection === 'undefined') {
+                    log('❌ PipeConnection类未定义');
+                    return;
+                }
+                log('✓ PipeConnection类可用');
+
+                // 创建简单管道
+                const pipe = new PipeConnection({
+                    name: '测试管道',
+                    startPoint: { x: -30, y: 10, z: 0 },
+                    endPoint: { x: 30, y: 20, z: 0 },
+                    pipeRadius: 1.0,
+                    pipeColor: 0xff0000,
+                    showFlow: true,
+                    pathStrategy: 'straight'
+                });
+
+                log('✓ 管道对象创建成功');
+                log(`管道组子对象数: ${pipe.group ? pipe.group.children.length : '未知'}`);
+
+                if (pipe.group) {
+                    scene.add(pipe.group);
+                    log('✓ 管道已添加到场景');
+                    log(`场景子对象总数: ${scene.children.length}`);
+
+                    // 添加起点终点标记
+                    const startMarker = new THREE.Mesh(
+                        new THREE.SphereGeometry(2, 16, 16),
+                        new THREE.MeshBasicMaterial({ color: 0x0000ff })
+                    );
+                    startMarker.position.set(-30, 10, 0);
+                    scene.add(startMarker);
+
+                    const endMarker = new THREE.Mesh(
+                        new THREE.SphereGeometry(2, 16, 16),
+                        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+                    );
+                    endMarker.position.set(30, 20, 0);
+                    scene.add(endMarker);
+
+                    log('✓ 起点终点标记已添加');
+                } else {
+                    log('❌ 管道组为空');
+                }
+
+            } catch (e) {
+                log(`❌ 管道创建失败: ${e.message}`);
+                log(`错误详情: ${e.stack}`);
+            }
+        }
+
+        function testModels() {
+            log('=== 测试模型类加载 ===');
+            
+            // 检查各个类是否可用
+            const classes = [
+                'THREE',
+                'PipeConnection', 
+                'PowerPlantBoiler',
+                'AirCompressorRoom',
+                'DemineralizedWaterTank'
+            ];
+
+            classes.forEach(className => {
+                try {
+                    const exists = typeof window[className] !== 'undefined';
+                    log(`${className}: ${exists ? '✓ 可用' : '❌ 未定义'}`);
+                } catch (e) {
+                    log(`${className}: ❌ 检查失败`);
+                }
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+
+        // 窗口调整
+        window.addEventListener('resize', () => {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+
+        log('最小调试页面已加载');
+    </script>
+</body>
+</html>
+
+
+
+
+

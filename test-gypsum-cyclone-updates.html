@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>石膏旋流器更新测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 1000;
+            max-width: 300px;
+        }
+        
+        #info h3 {
+            margin: 0 0 10px 0;
+            color: #4CAF50;
+        }
+        
+        #info ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        #info li {
+            margin: 5px 0;
+        }
+        
+        .highlight {
+            color: #FFD700;
+            font-weight: bold;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+        }
+        
+        .control-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .control-btn:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="info">
+            <h3>🔧 石膏旋流器更新测试</h3>
+            <p><strong>修改内容：</strong></p>
+            <ul>
+                <li>✅ 围栏高度：<span class="highlight">0.5米</span></li>
+                <li>✅ 灰色支撑柱高度调整为与平台同高</li>
+                <li>✅ 其他模型部分保持不变</li>
+            </ul>
+        </div>
+        
+        <div id="controls">
+            <button class="control-btn" onclick="resetCamera()">🔄 重置视角</button>
+            <button class="control-btn" onclick="toggleWireframe()">📐 线框模式</button>
+            <button class="control-btn" onclick="focusOnPlatform()">🎯 聚焦平台</button>
+            <button class="control-btn" onclick="focusOnSupports()">🏗️ 聚焦支撑</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="js/GypsumCyclone.js"></script>
+    
+    <script>
+        let scene, camera, renderer, controls;
+        let gypsumCyclone;
+        let wireframeMode = false;
+        
+        function init() {
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x2c3e50);
+            
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(10, 8, 10);
+            
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // 创建控制器
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // 添加光照
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            // 添加点光源突出显示围栏
+            const pointLight = new THREE.PointLight(0x4CAF50, 0.5, 50);
+            pointLight.position.set(0, 3, 0);
+            scene.add(pointLight);
+            
+            // 创建石膏旋流器
+            gypsumCyclone = new GypsumCyclone({ x: 0, y: 0, z: 0 });
+            scene.add(gypsumCyclone.getGroup());
+            
+            // 添加网格地面
+            const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x444444);
+            scene.add(gridHelper);
+            
+            // 添加坐标轴辅助器
+            const axesHelper = new THREE.AxesHelper(5);
+            scene.add(axesHelper);
+            
+            // 开始渲染循环
+            animate();
+            
+            console.log('🎯 石膏旋流器测试场景初始化完成');
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        function resetCamera() {
+            camera.position.set(10, 8, 10);
+            controls.target.set(0, 2, 0);
+            controls.update();
+        }
+        
+        function toggleWireframe() {
+            wireframeMode = !wireframeMode;
+            scene.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(mat => mat.wireframe = wireframeMode);
+                    } else {
+                        child.material.wireframe = wireframeMode;
+                    }
+                }
+            });
+        }
+        
+        function focusOnPlatform() {
+            // 聚焦到平台位置（Y=2）
+            camera.position.set(5, 3, 5);
+            controls.target.set(0, 2, 0);
+            controls.update();
+        }
+        
+        function focusOnSupports() {
+            // 聚焦到支撑结构
+            camera.position.set(8, 2, 8);
+            controls.target.set(0, 1, 0);
+            controls.update();
+        }
+        
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // 初始化场景
+        init();
+    </script>
+</body>
+</html>

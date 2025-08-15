@@ -1,0 +1,10 @@
+# 3D脱硫塔工艺流程图 - Python依赖
+# 本项目使用Python标准库，无需额外依赖
+
+# 如果需要更高级的HTTP服务器功能，可以考虑以下包：
+# flask>=2.0.0
+# fastapi>=0.68.0
+# uvicorn>=0.15.0
+
+# 开发工具（可选）
+# http-server  # Node.js版本的简单HTTP服务器

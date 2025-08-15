@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>屋脊式除雾器测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            overflow: hidden;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            max-width: 300px;
+        }
+        #info h3 {
+            margin: 0 0 10px 0;
+            color: #00ff88;
+        }
+        #info p {
+            margin: 5px 0;
+            line-height: 1.4;
+        }
+        .highlight {
+            color: #ffff00;
+            font-weight: bold;
+        }
+        .success {
+            color: #00ff88;
+        }
+        .enhanced {
+            color: #ff4500;
+        }
+        .micro {
+            color: #ff1493;
+        }
+        #debug {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 1001;
+            max-width: 400px;
+            max-height: 50vh;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+        }
+        #debug h4 {
+            margin: 0 0 10px 0;
+            color: #00ffff;
+        }
+        .error {
+            color: #ff4444;
+        }
+        .warning {
+            color: #ffaa00;
+        }
+        .info {
+            color: #44ff44;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        <h3>🏭 屋脊式除雾器测试</h3>
+        <p><span class="highlight">除雾器类型:</span> <span class="success">屋脊式除雾器</span></p>
+        <p><span class="highlight">除雾板结构:</span> 人字形（30°角）</p>
+        <p><span class="highlight">除雾效率:</span> >99.8%</p>
+        <p><span class="highlight">压力降:</span> <80 Pa</p>
+        <p><span class="enhanced">增强型冲洗:</span> 三层冲洗系统</p>
+        <p><span class="micro">板间冲洗:</span> 32个微型喷嘴</p>
+        <p><span class="highlight">支撑结构:</span> 中央辐射梁 + 环形连接</p>
+        <p style="margin-top: 10px; color: #87ceeb;">
+            鼠标左键拖拽旋转<br>
+            鼠标滚轮缩放<br>
+            右键查看内部结构
+        </p>
+    </div>
+    
+    <div id="debug">
+        <h4>🔧 调试信息</h4>
+        <div id="debugContent">正在初始化...</div>
+    </div>
+
+    <!-- Three.js - 使用更稳定的CDN -->
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <!-- 轨道控制器 -->
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- 引入脱硫塔类 -->
+    <script src="js/NaNValidator.js"></script>
+    <script src="js/DesulfurizationTower.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let tower;
+        let debugContent;
+        
+        // 调试日志函数
+        function debugLog(message, type = 'info') {
+            console.log(message);
+            if (!debugContent) {
+                debugContent = document.getElementById('debugContent');
+            }
+            if (debugContent) {
+                const timeStamp = new Date().toLocaleTimeString();
+                const className = type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'info';
+                debugContent.innerHTML += `<div class="${className}">[${timeStamp}] ${message}</div>`;
+                debugContent.scrollTop = debugContent.scrollHeight;
+            }
+        }
+        
+        // 初始化3D场景
+        function init() {
+            debugLog('=== 初始化屋脊式除雾器测试场景 ===');
+            
+            try {
+                // 检查Three.js是否加载
+                if (typeof THREE === 'undefined') {
+                    debugLog('Three.js 库未加载', 'error');
+                    return;
+                }
+                debugLog('✅ Three.js 库已加载');
+                
+                // 创建场景
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x87CEEB);
+                debugLog('✅ 场景创建完成');
+                
+                // 创建相机
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(50, 30, 50);
+                debugLog('✅ 相机创建完成');
+                
+                // 创建渲染器
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('container').appendChild(renderer.domElement);
+                debugLog('✅ 渲染器创建完成');
+                
+                // 检查轨道控制器
+                if (typeof THREE.OrbitControls === 'undefined') {
+                    debugLog('OrbitControls 未加载', 'warning');
+                } else {
+                    // 添加轨道控制器
+                    controls = new THREE.OrbitControls(camera, renderer.domElement);
+                    controls.enableDamping = true;
+                    controls.dampingFactor = 0.05;
+                    controls.maxDistance = 200;
+                    controls.minDistance = 10;
+                    debugLog('✅ 轨道控制器创建完成');
+                }
+                
+                // 添加光照
+                setupLighting();
+                debugLog('✅ 光照设置完成');
+                
+                // 创建脱硫塔（一级塔，包含屋脊式除雾器）
+                createTowerWithRidgeDemister();
+                
+                // 开始渲染循环
+                animate();
+                debugLog('✅ 渲染循环已启动');
+                
+                debugLog('🎉 屋脊式除雾器测试场景初始化完成');
+                
+            } catch (error) {
+                debugLog('初始化失败: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+        
+        function setupLighting() {
+            // 环境光
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            
+            // 主光源
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(50, 50, 50);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            // 补充光源
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+            fillLight.position.set(-50, 30, -50);
+            scene.add(fillLight);
+        }
+        
+        async function createTowerWithRidgeDemister() {
+            debugLog('=== 开始创建屋脊式除雾器脱硫塔 ===');
+            
+            // 检查必要的库是否加载
+            if (typeof THREE === 'undefined') {
+                debugLog('Three.js 库未加载', 'error');
+                return;
+            }
+            
+            if (typeof DesulfurizationTower === 'undefined') {
+                debugLog('DesulfurizationTower 类未加载', 'error');
+                return;
+            }
+            
+            debugLog('✅ 所有必要的库已加载');
+            
+            try {
+                // 创建一级塔配置（简化配置，确保稳定性）
+                const towerConfig = {
+                    name: '一级脱硫塔（屋脊式除雾器）',
+                    height: 30,
+                    upperRadius: 8,
+                    middleRadius: 8,
+                    lowerRadius: 12,
+                    position: { x: 0, y: 0, z: 0 },
+                    hasTrays: true,
+                    hasWetESP: false
+                };
+                
+                debugLog('📝 塔配置: ' + JSON.stringify(towerConfig, null, 2));
+                
+                // 创建脱硫塔实例
+                debugLog('🏗️ 正在创建塔实例...');
+                tower = new DesulfurizationTower(towerConfig);
+                
+                // 检查实例是否成功创建
+                if (!tower) {
+                    throw new Error('塔实例创建失败');
+                }
+                
+                debugLog('✅ 塔实例创建成功');
+                debugLog('🔄 等待初始化完成...');
+                
+                // 等待初始化完成
+                await tower.waitForInitialization();
+                
+                debugLog('✅ 塔初始化完成');
+                debugLog('📦 塔组件: ' + (tower.group ? '外部组件已创建' : '外部组件未创建'));
+                debugLog('📦 内部组件: ' + (tower.interiorGroup ? '内部组件已创建' : '内部组件未创建'));
+                
+                // 添加到场景
+                if (tower.group) {
+                    scene.add(tower.group);
+                    debugLog('✅ 外部组件已添加到场景 (子组件: ' + tower.group.children.length + '个)');
+                }
+                
+                if (tower.interiorGroup) {
+                    scene.add(tower.interiorGroup);
+                    debugLog('✅ 内部组件已添加到场景 (子组件: ' + tower.interiorGroup.children.length + '个)');
+                }
+                
+                // 显示内部结构
+                if (tower.showInterior) {
+                    tower.showInterior();
+                    debugLog('✅ 显示内部结构');
+                }
+                
+                // 输出组件统计
+                if (tower.components) {
+                    debugLog('📊 塔内组件列表:');
+                    for (const [name, component] of tower.components) {
+                        debugLog(`  - ${name}: ${component.children ? component.children.length : 0} 个子组件`);
+                    }
+                }
+                
+                // 检查除雾器
+                const demisters = tower.components ? tower.components.get('demisters') || tower.components.get('ridgeDemisters') : null;
+                if (demisters) {
+                    debugLog('🔧 屋脊式除雾器分析:');
+                    debugLog('- 名称: ' + demisters.name);
+                    debugLog('- 子组件数量: ' + demisters.children.length);
+                    
+                    // 统计不同类型的组件
+                    let ridgePlateCount = 0;
+                    let washingInterfaceCount = 0;
+                    
+                    demisters.traverse((child) => {
+                        if (child.name && child.name.includes('ridge_plate')) {
+                            ridgePlateCount++;
+                        }
+                        if (child.name && child.name.includes('ridge_washing_interface')) {
+                            washingInterfaceCount++;
+                        }
+                    });
+                    
+                    debugLog(`  ✓ 人字形除雾板: ${ridgePlateCount}个`);
+                    debugLog(`  ✓ 冲洗接口: ${washingInterfaceCount}个`);
+                } else {
+                    debugLog('⚠️ 未找到除雾器组件', 'warning');
+                }
+                
+                debugLog('🎉 屋脊式除雾器脱硫塔创建完成！');
+                
+            } catch (error) {
+                debugLog('❌ 创建屋脊式除雾器脱硫塔失败: ' + error.message, 'error');
+                debugLog('详细错误信息: ' + error.stack, 'error');
+                console.error('完整错误:', error);
+                
+                // 尝试创建简单的测试几何体
+                debugLog('🔧 尝试创建简单测试几何体...');
+                try {
+                    const testGeometry = new THREE.BoxGeometry(5, 5, 5);
+                    const testMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+                    const testMesh = new THREE.Mesh(testGeometry, testMaterial);
+                    testMesh.position.set(0, 5, 0);
+                    scene.add(testMesh);
+                    debugLog('✅ 红色测试立方体已添加到场景');
+                    
+                    // 添加绿色圆柱体
+                    const cylinderGeometry = new THREE.CylinderGeometry(2, 2, 10, 32);
+                    const cylinderMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+                    const cylinderMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
+                    cylinderMesh.position.set(8, 5, 0);
+                    scene.add(cylinderMesh);
+                    debugLog('✅ 绿色测试圆柱体已添加到场景');
+                    
+                } catch (testError) {
+                    debugLog('❌ 测试几何体创建也失败: ' + testError.message, 'error');
+                }
+            }
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (controls) {
+                controls.update();
+            }
+            
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+        
+        // 窗口大小调整
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        window.addEventListener('resize', onWindowResize);
+        
+        // 右键切换视图
+        document.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            if (tower) {
+                tower.toggleInteriorView();
+                console.log('切换视图模式:', tower.isInteriorView ? '内部视图' : '外部视图');
+            }
+        });
+        
+        // 键盘控制
+        document.addEventListener('keydown', (event) => {
+            if (!tower) return;
+            
+            switch(event.key.toLowerCase()) {
+                case 'i':
+                    tower.showInterior();
+                    console.log('显示内部结构');
+                    break;
+                case 'o':
+                    tower.hideInterior();
+                    console.log('隐藏内部结构');
+                    break;
+                case 'w':
+                    tower.toggleWireframeMode();
+                    console.log('切换线框模式');
+                    break;
+                case 'r':
+                    // 重置相机位置
+                    camera.position.set(50, 30, 50);
+                    controls.target.set(0, 15, 0);
+                    console.log('重置视角');
+                    break;
+            }
+        });
+        
+        // 页面加载完成后初始化
+        window.addEventListener('load', init);
+        
+        console.log('屋脊式除雾器测试系统已加载');
+        console.log('快捷键: I-显示内部, O-隐藏内部, W-线框模式, R-重置视角');
+    </script>
+</body>
+</html>

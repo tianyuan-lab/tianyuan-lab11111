@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D脱硫塔工艺流程图 - 精细化工业可视化</title>
+    <meta name="description" content="交互式3D脱硫塔工艺流程图，支持内部结构精细化查看">
+    <meta name="keywords" content="3D,脱硫塔,工艺流程,Three.js,工业可视化">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏭</text></svg>">
+</head>
+<body>
+    <div id="container">
+        <div id="loading">正在加载3D脱硫塔模型...</div>
+        
+        
+        
+        <div id="controls">
+            <button class="control-btn" onclick="resetView()" title="重置到默认视角">
+                🔄 重置视角
+            </button>
+            <button class="control-btn" onclick="toggleWireframe()" title="切换线框/实体显示模式">
+                📐 线框模式
+            </button>
+            <button class="control-btn" onclick="toggleFullscreen()" title="进入/退出全屏模式">
+                🖥️ 全屏模式
+            </button>
+            
+        </div>
+        
+        <div class="status-indicator" id="status">
+            <span class="fps">FPS: <span id="fps-counter">60</span></span>
+            <span class="objects">对象: <span id="object-counter">0</span></span>
+        </div>
+        
+        <!-- 缩放状态指示器 -->
+        <div class="zoom-indicator" id="zoom-indicator">
+            <div class="zoom-level">
+                <span class="zoom-label">缩放:</span>
+                <span class="zoom-value" id="zoom-value">100%</span>
+            </div>
+            <div class="focus-info">
+                <span class="focus-label">聚焦:</span>
+                <span class="focus-target" id="focus-target">场景中心</span>
+            </div>
+        </div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress"></div>
+        </div>
+        
+        <div class="tooltip" id="tooltip"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="js/NaNValidator.js"></script>
+    <script src="js/DesulfurizationTower.js"></script>
+    <script src="js/RecycleFilterTank.js"></script>
+    <script src="js/FilterLiquidTank.js"></script>
+    <script src="js/MetalPlatform.js"></script>
+    <script src="js/RecycleWaterPump.js"></script>
+    <script src="js/FilterLiquidPump.js"></script>
+    <script src="js/PipeConnection.js"></script>
+    <script src="js/MagneticBlower.js"></script>
+    <script src="js/AirSuspensionBlower.js"></script>
+    <script src="js/IntegratedGypsumSystem.js"></script>
+    <script src="js/SpiralStaircase.js"></script>
+    <script src="js/SlurryTank.js"></script>
+    <script src="js/SlurrySupplyPump.js"></script>
+    <script src="js/FluidizationBlower.js"></script>
+    <script src="js/PumpHouse.js"></script>
+    <script src="js/GypsumCyclone.js"></script>
+    <script src="js/VacuumBeltFilter.js"></script>
+    <script src="js/LabelFactory.js"></script>
+    <!-- 新增的周边设备脚本（用于在皮带机附近创建设备） -->
+    <script src="js/VacuumReceiverTank.js"></script>
+    <script src="js/LiquidRingVacuumPump.js"></script>
+    <script src="js/ClothWashTank.js"></script>
+    <script src="js/IndustrialBuilding.js"></script>
+     <script src="js/AirCompressorRoom.js"></script>
+    <script src="js/ParameterPanel.js"></script>
+    <script src="js/DemineralizedWaterTank.js"></script>
+    <script src="js/ProcessWaterTank.js"></script>
+    <script src="js/UreaSolutionTank.js"></script>
+    <script src="js/UreaCirculationPump.js"></script>
+    <script src="js/UreaDissolvingTank.js"></script>
+    <script src="js/UreaTransferPump.js"></script>
+    <script src="js/EmergencyWaterTank.js"></script>
+    <script src="js/ElectrostaticBagFilter.js"></script>
+    <script src="js/InducedDraftFan.js"></script>
+    <script src="js/RectToRoundDuct.js"></script>
+    <script src="js/BagFilterOutlet.js"></script>
+    <script src="js/LShapedDuct.js"></script>
+    <script src="js/Boiler.js"></script>
+    <script src="js/BoilerFlue.js"></script>
+    <script src="js/PowerPlantBoiler.js"></script>
+    <script src="js/SCRReactor.js"></script>
+    <script src="js/InFurnaceCalciumInjection.js"></script>
+<script src="js/EmergencyWaterPump.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

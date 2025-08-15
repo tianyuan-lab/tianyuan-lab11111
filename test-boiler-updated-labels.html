@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>锅炉标签测试 - 工业综合楼风格</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 14px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+        
+        .control-btn {
+            display: block;
+            margin: 5px 0;
+            padding: 8px 15px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: 1px solid #555;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .control-btn:hover {
+            background: rgba(0,0,0,0.9);
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        <div>锅炉标签测试 - 工业综合楼风格</div>
+        <div>鼠标拖拽旋转视角</div>
+        <div>滚轮缩放</div>
+        <div>右侧按钮切换内外部视图</div>
+    </div>
+    
+    <div id="controls">
+        <button class="control-btn" onclick="toggleView()">切换内外部视图</button>
+        <button class="control-btn" onclick="resetCamera()">重置视角</button>
+    </div>
+
+    <!-- Three.js 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- 锅炉模型 -->
+    <script src="js/PowerPlantBoiler.js"></script>
+
+    <script>
+        // 场景设置
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+
+        // 相机设置
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(80, 60, 80);
+
+        // 渲染器设置
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // 添加轨道控制器
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 25, 0);
+
+        // 添加光照
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(100, 100, 50);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+
+        // 添加地面
+        const groundGeometry = new THREE.PlaneGeometry(200, 200);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x90EE90 });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // 创建锅炉
+        const boiler = new PowerPlantBoiler({
+            name: '测试锅炉',
+            position: { x: 0, y: 0, z: 0 }
+        });
+        scene.add(boiler.getGroup());
+        
+        // 使用与工业综合楼相同的标签创建逻辑
+        function createIndustrialBuildingLabel(buildingGroup, labelText, position, color = '#FFFFFF') {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 320;
+            canvas.height = 100;
+            
+            // 设置字体和样式
+            context.font = 'Bold 40px Microsoft YaHei, Arial';
+            context.fillStyle = color;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            
+            // 绘制背景 - 圆角矩形
+            context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            roundRect(context, 10, 10, canvas.width - 20, canvas.height - 20, 10);
+            context.fill();
+            
+            // 绘制边框
+            context.strokeStyle = color;
+            context.lineWidth = 3;
+            roundRect(context, 10, 10, canvas.width - 20, canvas.height - 20, 10);
+            context.stroke();
+            
+            // 绘制文字
+            context.fillStyle = color;
+            context.fillText(labelText, canvas.width / 2, canvas.height / 2);
+            
+            // 创建纹理
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            
+            // 创建材质
+            const material = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 0.95,
+                alphaTest: 0.01
+            });
+            
+            // 创建精灵
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(15, 4, 1);
+            sprite.position.set(position.x, position.y, position.z);
+            sprite.name = `buildingLabel_${labelText}`;
+            
+            // 添加到建筑组
+            buildingGroup.add(sprite);
+            
+            console.log(`✓ 创建${labelText}标签完成`);
+        }
+        
+        // 绘制圆角矩形
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+        }
+        
+        // 为锅炉添加标签
+        createIndustrialBuildingLabel(
+            boiler.getGroup(), 
+            '火电厂锅炉', 
+            { x: 0, y: boiler.dimensions.supportHeight + boiler.dimensions.mainHeight + 15, z: 0 }, 
+            '#FFD54F'
+        );
+
+        // 视图切换功能
+        let isInteriorView = false;
+        function toggleView() {
+            if (isInteriorView) {
+                boiler.showExterior();
+                isInteriorView = false;
+                console.log('切换到外部视图');
+            } else {
+                boiler.showInterior();
+                isInteriorView = true;
+                console.log('切换到内部视图');
+            }
+        }
+        
+        // 重置相机
+        function resetCamera() {
+            camera.position.set(80, 60, 80);
+            controls.target.set(0, 25, 0);
+            controls.update();
+        }
+
+        // 渲染循环
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            controls.update();
+            
+            // 更新火焰动画
+            if (boiler && typeof boiler.updateFlameAnimation === 'function') {
+                boiler.updateFlameAnimation();
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 开始动画
+        animate();
+
+        console.log('锅炉标签测试页面已加载 - 工业综合楼风格');
+    </script>
+    
+    <!-- OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js"></script>
+</body>
+</html>

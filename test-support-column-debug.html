@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>支撑柱调试测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 400px;
+            z-index: 100;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        #canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>🔧 支撑柱位置调试测试</h3>
+        <p>查看前方支撑柱是否有位置偏移</p>
+        <div id="debug-output"></div>
+    </div>
+    
+    <canvas id="canvas"></canvas>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.132.2';
+        import { OrbitControls } from 'https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/OrbitControls.js';
+        
+        // 强制重新加载模块，避免缓存问题
+        const timestamp = Date.now();
+        const { GypsumCyclone } = await import(`./js/GypsumCyclone.js?v=${timestamp}`);
+
+        // 场景设置
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x2c3e50);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        // 控制器
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // 光照
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 20, 10);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        // 重定向console.log到页面显示
+        const debugOutput = document.getElementById('debug-output');
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            debugOutput.innerHTML += args.join(' ') + '<br>';
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+        };
+
+        // 创建石膏旋流器
+        console.log('🚀 开始创建石膏旋流器（强制重新加载）...');
+        const cyclone = new GypsumCyclone();
+        scene.add(cyclone.getGroup());
+
+        // 相机位置
+        camera.position.set(8, 4, 8);
+        controls.target.set(0, 2, 0);
+        controls.update();
+
+        // 渲染循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // 窗口调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+        
+        console.log('🎯 测试页面加载完成！查看前方支撑柱是否有偏移。');
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

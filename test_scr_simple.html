@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCR反应器独立测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            overflow: hidden;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 100;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            z-index: 200;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        <div>SCR反应器独立测试</div>
+        <div id="status">初始化中...</div>
+    </div>
+    <div id="loading">加载中...</div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- SCR反应器类 -->
+    <script src="js/SCRReactor.js"></script>
+    
+    <script>
+        let scene, camera, renderer, controls;
+        let scrReactor;
+        
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+            console.log(message);
+        }
+        
+        function init() {
+            try {
+                updateStatus('创建Three.js场景...');
+                
+                // 创建场景
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x87CEEB);
+                
+                // 创建相机
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(20, 15, 20);
+                
+                // 创建渲染器
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('container').appendChild(renderer.domElement);
+                
+                // 创建控制器
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                
+                updateStatus('添加光照...');
+                
+                // 添加光照
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+                scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(50, 50, 50);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                scene.add(directionalLight);
+                
+                // 添加地面
+                const groundGeometry = new THREE.PlaneGeometry(100, 100);
+                const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x90EE90 });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                scene.add(ground);
+                
+                updateStatus('检查SCRReactor类...');
+                
+                // 检查SCRReactor类是否存在
+                if (typeof SCRReactor === 'undefined') {
+                    throw new Error('SCRReactor类未定义');
+                }
+                
+                updateStatus('创建SCR反应器...');
+                
+                // 创建SCR反应器
+                scrReactor = new SCRReactor({
+                    name: 'SCR脱硝反应器测试',
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 },
+                    scale: 1.0,
+                    L: 10,
+                    W: 6,
+                    H: 8,
+                    layerCount: 3,
+                    layerThickness: 1.2,
+                    blocksX: 8,
+                    blocksY: 8,
+                    inletSize: [4, 4],
+                    outletSize: [4, 4],
+                    showAIG: true,
+                    aigRows: 5,
+                    aigCols: 8
+                });
+                
+                updateStatus('添加到场景...');
+                
+                // 添加到场景
+                scene.add(scrReactor.getGroup());
+                
+                updateStatus('SCR反应器创建成功！');
+                console.log('SCR反应器模型信息:', scrReactor.getModelInfo());
+                
+                // 隐藏加载提示
+                document.getElementById('loading').style.display = 'none';
+                
+                // 开始渲染循环
+                animate();
+                
+            } catch (error) {
+                updateStatus('错误: ' + error.message);
+                console.error('初始化失败:', error);
+                document.getElementById('loading').textContent = '加载失败: ' + error.message;
+            }
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (controls) {
+                controls.update();
+            }
+            
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+        
+        function onWindowResize() {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        }
+        
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

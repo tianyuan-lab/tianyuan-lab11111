@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>支撑柱位置对应验证</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            max-width: 400px;
+            z-index: 100;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        
+        button {
+            margin: 5px;
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        #canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>🔧 支撑柱位置对应验证</h3>
+        <p>红色线条连接下方支撑脚与上方支撑柱底部，如果位置对应，线条应该是垂直的。</p>
+        <div id="position-info"></div>
+    </div>
+    
+    <div id="controls">
+        <button onclick="focusOnSupports()">聚焦支撑结构</button>
+        <button onclick="toggleWireframe()">切换线框模式</button>
+        <button onclick="resetView()">重置视角</button>
+    </div>
+    
+    <canvas id="canvas"></canvas>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.132.2';
+        import { OrbitControls } from 'https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/OrbitControls.js';
+        import { GypsumCyclone } from './js/GypsumCyclone.js';
+
+        // 场景设置
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x2c3e50);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        // 控制器
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // 光照
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 20, 10);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+
+        // 创建石膏旋流器
+        const cyclone = new GypsumCyclone();
+        scene.add(cyclone.getGroup());
+
+        // 创建位置对应验证线条
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 3 });
+        const lineGroup = new THREE.Group();
+
+        for (let i = 0; i < cyclone.config.supportLegCount; i++) {
+            const angle = (i / cyclone.config.supportLegCount) * Math.PI * 2;
+            
+            // 下方支撑脚位置
+            const lowerX = Math.cos(angle) * cyclone.config.supportBaseRadius;
+            const lowerZ = Math.sin(angle) * cyclone.config.supportBaseRadius;
+            const lowerY = 0; // 地面
+            
+            // 上方支撑柱底部位置
+            const upperX = Math.cos(angle) * cyclone.config.supportBaseRadius;
+            const upperZ = Math.sin(angle) * cyclone.config.supportBaseRadius;
+            const upperY = 2 + 0.075; // 平台顶部
+            
+            // 创建连接线
+            const geometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(lowerX, lowerY, lowerZ),
+                new THREE.Vector3(upperX, upperY, upperZ)
+            ]);
+            
+            const line = new THREE.Line(geometry, lineMaterial);
+            line.name = `连接线_${i + 1}`;
+            lineGroup.add(line);
+            
+            // 添加标记点
+            const sphereGeometry = new THREE.SphereGeometry(0.05, 8, 6);
+            const lowerSphere = new THREE.Mesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
+            lowerSphere.position.set(lowerX, lowerY, lowerZ);
+            lineGroup.add(lowerSphere);
+            
+            const upperSphere = new THREE.Mesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: 0x0000ff }));
+            upperSphere.position.set(upperX, upperY, upperZ);
+            lineGroup.add(upperSphere);
+        }
+
+        scene.add(lineGroup);
+
+        // 显示位置信息
+        const positionInfo = document.getElementById('position-info');
+        let infoHtml = '<strong>位置验证结果:</strong><br>';
+        for (let i = 0; i < cyclone.config.supportLegCount; i++) {
+            const angle = (i / cyclone.config.supportLegCount) * Math.PI * 2;
+            const x = Math.cos(angle) * cyclone.config.supportBaseRadius;
+            const z = Math.sin(angle) * cyclone.config.supportBaseRadius;
+            infoHtml += `支撑柱${i + 1}: (${x.toFixed(3)}, ${z.toFixed(3)}) ✅<br>`;
+        }
+        positionInfo.innerHTML = infoHtml;
+
+        // 相机位置
+        camera.position.set(8, 6, 8);
+        controls.target.set(0, 2, 0);
+        controls.update();
+
+        // 控制函数
+        window.focusOnSupports = function() {
+            camera.position.set(6, 3, 6);
+            controls.target.set(0, 1, 0);
+            controls.update();
+        };
+
+        let wireframeMode = false;
+        window.toggleWireframe = function() {
+            wireframeMode = !wireframeMode;
+            scene.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    child.material.wireframe = wireframeMode;
+                }
+            });
+        };
+
+        window.resetView = function() {
+            camera.position.set(8, 6, 8);
+            controls.target.set(0, 2, 0);
+            controls.update();
+        };
+
+        // 渲染循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // 窗口调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

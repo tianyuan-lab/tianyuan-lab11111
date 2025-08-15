@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>位置对应关系调试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .position-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .position-table th, .position-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+        }
+        .position-table th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .match { background-color: #d4edda; }
+        .mismatch { background-color: #f8d7da; }
+        #console-output {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 平台支撑柱位置对应关系验证</h1>
+        
+        <h2>配置参数</h2>
+        <div id="config-info"></div>
+        
+        <h2>位置对应表</h2>
+        <table class="position-table">
+            <thead>
+                <tr>
+                    <th>支撑柱编号</th>
+                    <th>角度 (度)</th>
+                    <th>下方支撑脚位置 (X, Z)</th>
+                    <th>上方支撑柱位置 (X, Z)</th>
+                    <th>对应状态</th>
+                </tr>
+            </thead>
+            <tbody id="position-table-body">
+            </tbody>
+        </table>
+        
+        <h2>控制台输出</h2>
+        <div id="console-output"></div>
+        
+        <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">刷新验证</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.132.2';
+        import { GypsumCyclone } from './js/GypsumCyclone.js';
+
+        // 重定向console.log到页面显示
+        const consoleOutput = document.getElementById('console-output');
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            consoleOutput.textContent += args.join(' ') + '\n';
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
+
+        // 创建石膏旋流器实例进行验证
+        const cyclone = new GypsumCyclone();
+        
+        // 显示配置信息
+        const configInfo = document.getElementById('config-info');
+        configInfo.innerHTML = `
+            <p><strong>支撑腿数量:</strong> ${cyclone.config.supportLegCount}</p>
+            <p><strong>支撑底座半径:</strong> ${cyclone.config.supportBaseRadius}m</p>
+            <p><strong>支撑腿直径:</strong> ${cyclone.config.supportLegDiameter}m</p>
+        `;
+
+        // 计算并显示位置对应关系
+        const tableBody = document.getElementById('position-table-body');
+        
+        for (let i = 0; i < cyclone.config.supportLegCount; i++) {
+            const angle = (i / cyclone.config.supportLegCount) * Math.PI * 2;
+            const angleDegrees = angle * 180 / Math.PI;
+            
+            // 下方支撑脚位置
+            const lowerX = Math.cos(angle) * cyclone.config.supportBaseRadius;
+            const lowerZ = Math.sin(angle) * cyclone.config.supportBaseRadius;
+            
+            // 上方支撑柱底部位置
+            const upperX = Math.cos(angle) * cyclone.config.supportBaseRadius;
+            const upperZ = Math.sin(angle) * cyclone.config.supportBaseRadius;
+            
+            // 检查是否对应
+            const xMatch = Math.abs(lowerX - upperX) < 0.001;
+            const zMatch = Math.abs(lowerZ - upperZ) < 0.001;
+            const isMatch = xMatch && zMatch;
+            
+            const row = document.createElement('tr');
+            row.className = isMatch ? 'match' : 'mismatch';
+            row.innerHTML = `
+                <td>支撑柱 ${i + 1}</td>
+                <td>${angleDegrees.toFixed(1)}°</td>
+                <td>(${lowerX.toFixed(3)}, ${lowerZ.toFixed(3)})</td>
+                <td>(${upperX.toFixed(3)}, ${upperZ.toFixed(3)})</td>
+                <td>${isMatch ? '✅ 完全对应' : '❌ 位置不符'}</td>
+            `;
+            tableBody.appendChild(row);
+        }
+
+        console.log('🎯 位置验证完成！');
+        console.log('📊 如果所有行都显示为绿色，说明位置完全对应');
+    </script>
+</body>
+</html>

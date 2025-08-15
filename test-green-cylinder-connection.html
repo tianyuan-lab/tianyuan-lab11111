@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>石膏旋流器 - 绿色小圆柱连接测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 300px;
+            z-index: 100;
+        }
+        
+        .status {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .highlight {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="info-panel">
+        <h3>🔍 绿色小圆柱连接测试</h3>
+        <div class="status">状态: <span id="status">初始化中...</span></div>
+        <div class="status">绿色锥体: <span id="cone-count">0</span> 个</div>
+        <div class="status">绿色小圆柱: <span id="cylinder-count">0</span> 个</div>
+        <div class="status">蓝色软管: <span id="hose-count">0</span> 个</div>
+        <div class="status highlight">连接方式: 绿色锥体 → 绿色小圆柱 → 蓝色软管 → 白色集流器</div>
+    </div>
+
+    <div class="controls">
+        <button onclick="validateConnections()">🔍 验证连接</button>
+        <button onclick="showCoordinates()">📍 显示坐标</button>
+        <button onclick="resetView()">🎯 重置视角</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="js/GypsumCyclone.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let gypsumCyclone;
+
+        function init() {
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(15, 10, 15);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // 创建控制器
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 5, 0);
+
+            // 添加灯光
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(10, 20, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            // 添加点光源照亮绿色小圆柱
+            const spotLight = new THREE.SpotLight(0xffffff, 0.8);
+            spotLight.position.set(0, 15, 0);
+            spotLight.target.position.set(0, 3, 0);
+            spotLight.castShadow = true;
+            scene.add(spotLight);
+            scene.add(spotLight.target);
+
+            // 创建地面
+            const groundGeometry = new THREE.PlaneGeometry(50, 50);
+            const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x90EE90 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            updateStatus('正在创建石膏旋流器...');
+
+            // 创建石膏旋流器
+            gypsumCyclone = new GypsumCyclone({ x: 0, y: 0, z: 0 });
+            scene.add(gypsumCyclone.getGroup());
+
+            updateStatus('石膏旋流器创建完成');
+            updateCounts();
+
+            // 开始渲染循环
+            animate();
+
+            // 延迟验证连接
+            setTimeout(() => {
+                validateConnections();
+                showDetailedInfo();
+            }, 1000);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+
+        function updateCounts() {
+            if (gypsumCyclone && gypsumCyclone.components) {
+                const coneCount = gypsumCyclone.components.cyclones ? 
+                    gypsumCyclone.components.cyclones.children.length : 0;
+                const hoseCount = gypsumCyclone.components.hoses ? 
+                    gypsumCyclone.components.hoses.children.length : 0;
+                
+                document.getElementById('cone-count').textContent = coneCount;
+                document.getElementById('hose-count').textContent = hoseCount;
+                
+                // 计算绿色小圆柱数量
+                let cylinderCount = 0;
+                if (gypsumCyclone.components.hoses) {
+                    gypsumCyclone.components.hoses.children.forEach(hoseGroup => {
+                        hoseGroup.children.forEach(child => {
+                            if (child.name && child.name.includes('绿色连接器')) {
+                                cylinderCount++;
+                            }
+                        });
+                    });
+                }
+                document.getElementById('cylinder-count').textContent = cylinderCount;
+            }
+        }
+
+        function validateConnections() {
+            if (gypsumCyclone && gypsumCyclone.validateAlignment) {
+                console.group('🔍 手动验证连接');
+                const result = gypsumCyclone.validateAlignment();
+                if (result) {
+                    updateStatus('✅ 所有连接验证通过');
+                } else {
+                    updateStatus('❌ 连接验证失败');
+                }
+                console.groupEnd();
+            }
+        }
+
+        function showCoordinates() {
+            if (gypsumCyclone) {
+                console.group('📍 坐标信息');
+                
+                // 显示绿色小圆柱坐标
+                const greenCylinders = gypsumCyclone.getGreenCylinderCoordinates();
+                console.log('绿色小圆柱坐标:');
+                greenCylinders.forEach((coord, index) => {
+                    console.log(`  ${index + 1}. (${coord.x.toFixed(3)}, ${coord.y.toFixed(3)}, ${coord.z.toFixed(3)})`);
+                });
+                
+                // 显示软管底部坐标
+                const hoseBottoms = gypsumCyclone.getHoseBottomCoordinates();
+                console.log('蓝色软管底部坐标:');
+                hoseBottoms.forEach((coord, index) => {
+                    console.log(`  ${index + 1}. (${coord.x.toFixed(3)}, ${coord.y.toFixed(3)}, ${coord.z.toFixed(3)})`);
+                });
+                
+                console.groupEnd();
+            }
+        }
+
+        function showDetailedInfo() {
+            console.group('🎯 详细连接信息');
+            
+            if (gypsumCyclone && gypsumCyclone.components) {
+                // 分析每个组件
+                const cyclones = gypsumCyclone.components.cyclones;
+                const hoses = gypsumCyclone.components.hoses;
+                
+                console.log('=== 绿色锥体分析 ===');
+                if (cyclones) {
+                    cyclones.children.forEach((cone, index) => {
+                        const pos = cone.position;
+                        const userData = cone.userData;
+                        console.log(`锥体${index + 1}: 位置(${pos.x.toFixed(3)}, ${pos.y.toFixed(3)}, ${pos.z.toFixed(3)})`);
+                        if (userData.greenCylinderConnectionCoord) {
+                            const coord = userData.greenCylinderConnectionCoord;
+                            console.log(`  → 连接目标: (${coord.x.toFixed(3)}, ${coord.y.toFixed(3)}, ${coord.z.toFixed(3)})`);
+                        }
+                    });
+                }
+
+                console.log('=== 绿色小圆柱分析 ===');
+                if (hoses) {
+                    hoses.children.forEach((hoseGroup, index) => {
+                        hoseGroup.children.forEach(child => {
+                            if (child.name && child.name.includes('绿色连接器')) {
+                                const pos = child.position;
+                                console.log(`绿色连接器${index + 1}: 位置(${pos.x.toFixed(3)}, ${pos.y.toFixed(3)}, ${pos.z.toFixed(3)})`);
+                            }
+                        });
+                    });
+                }
+            }
+            
+            console.groupEnd();
+        }
+
+        function resetView() {
+            camera.position.set(15, 10, 15);
+            controls.target.set(0, 5, 0);
+            controls.update();
+        }
+
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>
